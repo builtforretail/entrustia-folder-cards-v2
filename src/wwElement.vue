@@ -10,17 +10,25 @@
       <div class="card-actions">
         <button
           class="btn-action btn-open"
-          :style="openButtonStyle"
+          :style="getOpenButtonStyle(item.id)"
           type="button"
           @click="handleOpen(item)"
+          @mouseenter="setHover(item.id, 'open', true)"
+          @mouseleave="setHover(item.id, 'open', false)"
+          @mousedown="setActive(item.id, 'open', true)"
+          @mouseup="setActive(item.id, 'open', false)"
         >
           Open
         </button>
         <button
           class="btn-action btn-edit"
-          :style="editButtonStyle"
+          :style="getEditButtonStyle(item.id)"
           type="button"
           @click="handleEdit(item)"
+          @mouseenter="setHover(item.id, 'edit', true)"
+          @mouseleave="setHover(item.id, 'edit', false)"
+          @mousedown="setActive(item.id, 'edit', true)"
+          @mouseup="setActive(item.id, 'edit', false)"
         >
           Edit
         </button>
@@ -81,7 +89,7 @@
 </template>
 
 <script>
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
 
 export default {
   name: 'FolderCardList',
@@ -117,6 +125,18 @@ export default {
         defaultValue: 0,
       });
 
+    // Hover/active state tracking: { 'id-open': true, 'id-edit': true }
+    const hoverState = ref({});
+    const activeState = ref({});
+
+    const setHover = (id, btn, val) => {
+      hoverState.value = { ...hoverState.value, [id + '-' + btn]: val };
+    };
+
+    const setActive = (id, btn, val) => {
+      activeState.value = { ...activeState.value, [id + '-' + btn]: val };
+    };
+
     const processedItems = computed(() => {
       const items = props.content?.data || [];
       const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
@@ -145,6 +165,48 @@ export default {
     const resolvedPrimaryColor = computed(() => props.content?.primaryColor || '#2d6a4f');
     const resolvedOutlineColor = computed(() => props.content?.outlineColor || '#2d6a4f');
 
+    // Darken a hex color by a given amount
+    const darken = (hex, amount) => {
+      const h = hex.replace('#', '');
+      const num = parseInt(h, 16);
+      let r = Math.max(0, (num >> 16) - amount);
+      let g = Math.max(0, ((num >> 8) & 0xff) - amount);
+      let b = Math.max(0, (num & 0xff) - amount);
+      return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    };
+
+    const getOpenButtonStyle = (id) => {
+      const isActive = activeState.value[id + '-open'];
+      const isHovered = hoverState.value[id + '-open'];
+      const base = resolvedPrimaryColor.value;
+      const bg = isActive ? darken(base, 40) : isHovered ? darken(base, 20) : base;
+      return {
+        backgroundColor: bg,
+        color: '#ffffff',
+        borderColor: bg,
+        fontSize: (props.content?.fontSize ?? 14) + 'px',
+        boxShadow: isHovered && !isActive ? '0 2px 6px rgba(0,0,0,0.18)' : 'none',
+        transform: isActive ? 'scale(0.97)' : 'scale(1)',
+        transition: 'background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease',
+      };
+    };
+
+    const getEditButtonStyle = (id) => {
+      const isActive = activeState.value[id + '-edit'];
+      const isHovered = hoverState.value[id + '-edit'];
+      const base = resolvedOutlineColor.value;
+      const darkened = isActive ? darken(base, 40) : isHovered ? darken(base, 20) : base;
+      return {
+        backgroundColor: isHovered ? (isActive ? darken(base, 40) : darken(base, 20)) : '#ffffff',
+        color: isHovered ? '#ffffff' : base,
+        borderColor: darkened,
+        fontSize: (props.content?.fontSize ?? 14) + 'px',
+        boxShadow: isHovered && !isActive ? '0 2px 6px rgba(0,0,0,0.18)' : 'none',
+        transform: isActive ? 'scale(0.97)' : 'scale(1)',
+        transition: 'background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease',
+      };
+    };
+
     const containerStyle = computed(() => ({
       '--fcl-primary': resolvedPrimaryColor.value,
       '--fcl-outline': resolvedOutlineColor.value,
@@ -166,20 +228,6 @@ export default {
       background: props.content?.cardBackground || '#ffffff',
       border: '1px solid ' + (props.content?.cardBorderColor || '#e5e7eb'),
       borderRadius: (props.content?.cardBorderRadius ?? 8) + 'px',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
-    }));
-
-    const openButtonStyle = computed(() => ({
-      backgroundColor: resolvedPrimaryColor.value,
-      color: '#ffffff',
-      borderColor: resolvedPrimaryColor.value,
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
-    }));
-
-    const editButtonStyle = computed(() => ({
-      backgroundColor: '#ffffff',
-      color: resolvedOutlineColor.value,
-      borderColor: resolvedOutlineColor.value,
       fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
@@ -249,8 +297,8 @@ export default {
       processedItems,
       containerStyle,
       cardStyle,
-      openButtonStyle,
-      editButtonStyle,
+      getOpenButtonStyle,
+      getEditButtonStyle,
       folderNameStyle,
       labelStyle,
       valueStyle,
@@ -262,6 +310,8 @@ export default {
       handleOpen,
       handleEdit,
       handleNameClick,
+      setHover,
+      setActive,
       selectedItem,
       itemCount,
       /* wwEditor:start */
