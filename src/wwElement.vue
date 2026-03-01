@@ -1,7 +1,29 @@
 <template>
   <div class="folder-card-list" :style="containerStyle">
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-search-wrap">
+        <span class="filter-search-icon">🔍</span>
+        <input
+          class="filter-input"
+          type="text"
+          placeholder="Folder Name"
+          :value="searchQuery"
+          @input="handleSearchInput"
+        />
+      </div>
+      <select class="filter-select" :value="portalFilter" @change="handlePortalChange">
+        <option value="all">All</option>
+        <option value="active">Active Public Page</option>
+        <option value="inactive">No Public Page</option>
+      </select>
+      <button class="filter-reset" type="button" @click="handleReset">Reset</button>
+    </div>
+
+    <!-- Cards -->
     <div
-      v-for="item in processedItems"
+      v-for="item in filteredItems"
       :key="item.id"
       class="folder-card"
       :style="cardStyle"
@@ -52,7 +74,7 @@
       <!-- Files -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">Files</span>
-        <span class="field-value" :style="valueStyle">{{ item.file_count ?? 0 }}</span>
+        <span class="field-value" :style="valueStyle">{{ item.file_count || 0 }}</span>
       </div>
 
       <!-- AI Policy -->
@@ -82,14 +104,14 @@
     </div>
 
     <!-- Empty state -->
-    <div v-if="!processedItems.length" class="empty-state" :style="emptyStateStyle">
+    <div v-if="!filteredItems.length" class="empty-state" :style="emptyStateStyle">
       No folders to display.
     </div>
   </div>
 </template>
 
 <script>
-import { computed, watch, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 export default {
   name: 'FolderCardList',
@@ -125,7 +147,18 @@ export default {
         defaultValue: 0,
       });
 
-    // Hover/active state tracking: { 'id-open': true, 'id-edit': true }
+    const { value: filteredCount, setValue: setFilteredCount } =
+      wwLib.wwVariable.useComponentVariable({
+        uid: props.uid,
+        name: 'filteredCount',
+        type: 'number',
+        defaultValue: 0,
+      });
+
+    // Filter state
+    const searchQuery = ref('');
+    const portalFilter = ref('all');
+
     const hoverState = ref({});
     const activeState = ref({});
 
@@ -135,6 +168,19 @@ export default {
 
     const setActive = (id, btn, val) => {
       activeState.value = { ...activeState.value, [id + '-' + btn]: val };
+    };
+
+    const handleSearchInput = (e) => {
+      searchQuery.value = e.target.value;
+    };
+
+    const handlePortalChange = (e) => {
+      portalFilter.value = e.target.value;
+    };
+
+    const handleReset = () => {
+      searchQuery.value = '';
+      portalFilter.value = 'all';
     };
 
     const processedItems = computed(() => {
@@ -150,29 +196,45 @@ export default {
 
         return {
           ...item,
-          id: id ?? 'item-' + Math.random(),
-          name: name ?? 'Untitled',
-          file_count: file_count ?? 0,
-          read_content_mode: read_content_mode ?? '',
+          id: id || 'item-' + Math.random(),
+          name: name || 'Untitled',
+          file_count: file_count || 0,
+          read_content_mode: read_content_mode || '',
           has_public_portal: Boolean(has_public_portal),
           _original: item,
         };
       });
     });
 
-    watch(processedItems, (items) => { setItemCount(items?.length ?? 0); }, { immediate: true });
+    const filteredItems = computed(() => {
+      let items = processedItems.value;
+      const q = (searchQuery.value || '').toLowerCase().trim();
+      const p = portalFilter.value;
+
+      if (q) {
+        items = items.filter((item) => (item.name || '').toLowerCase().indexOf(q) !== -1);
+      }
+      if (p === 'active') {
+        items = items.filter((item) => item.has_public_portal === true);
+      } else if (p === 'inactive') {
+        items = items.filter((item) => item.has_public_portal === false);
+      }
+      return items;
+    });
+
+    watch(processedItems, (items) => { setItemCount(items.length || 0); }, { immediate: true });
+    watch(filteredItems, (items) => { setFilteredCount(items.length || 0); }, { immediate: true });
 
     const resolvedPrimaryColor = computed(() => props.content?.primaryColor || '#2d6a4f');
     const resolvedOutlineColor = computed(() => props.content?.outlineColor || '#2d6a4f');
 
-    // Darken a hex color by a given amount
     const darken = (hex, amount) => {
-      const h = hex.replace('#', '');
-      const num = parseInt(h, 16);
-      let r = Math.max(0, (num >> 16) - amount);
-      let g = Math.max(0, ((num >> 8) & 0xff) - amount);
-      let b = Math.max(0, (num & 0xff) - amount);
-      return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+      const h = (hex || '#2d6a4f').replace('#', '');
+      const num = parseInt(h.length === 3 ? h.split('').map(function(c) { return c + c; }).join('') : h, 16);
+      const r = Math.max(0, (num >> 16) - amount);
+      const g = Math.max(0, ((num >> 8) & 0xff) - amount);
+      const b = Math.max(0, (num & 0xff) - amount);
+      return '#' + [r, g, b].map(function(v) { return v.toString(16).padStart(2, '0'); }).join('');
     };
 
     const getOpenButtonStyle = (id) => {
@@ -184,7 +246,7 @@ export default {
         backgroundColor: bg,
         color: '#ffffff',
         borderColor: bg,
-        fontSize: (props.content?.fontSize ?? 14) + 'px',
+        fontSize: (props.content?.fontSize || 14) + 'px',
         boxShadow: isHovered && !isActive ? '0 2px 6px rgba(0,0,0,0.18)' : 'none',
         transform: isActive ? 'scale(0.97)' : 'scale(1)',
         transition: 'background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease',
@@ -200,7 +262,7 @@ export default {
         backgroundColor: isHovered ? (isActive ? darken(base, 40) : darken(base, 20)) : '#ffffff',
         color: isHovered ? '#ffffff' : base,
         borderColor: darkened,
-        fontSize: (props.content?.fontSize ?? 14) + 'px',
+        fontSize: (props.content?.fontSize || 14) + 'px',
         boxShadow: isHovered && !isActive ? '0 2px 6px rgba(0,0,0,0.18)' : 'none',
         transform: isActive ? 'scale(0.97)' : 'scale(1)',
         transition: 'background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease',
@@ -212,38 +274,38 @@ export default {
       '--fcl-outline': resolvedOutlineColor.value,
       '--fcl-card-bg': props.content?.cardBackground || '#ffffff',
       '--fcl-card-border': props.content?.cardBorderColor || '#e5e7eb',
-      '--fcl-card-radius': (props.content?.cardBorderRadius ?? 8) + 'px',
+      '--fcl-card-radius': (props.content?.cardBorderRadius || 8) + 'px',
       '--fcl-label-color': props.content?.labelTextColor || '#6b7280',
       '--fcl-value-color': props.content?.valueTextColor || '#111827',
       '--fcl-name-color': props.content?.folderNameColor || '#2d6a4f',
-      '--fcl-gap': (props.content?.cardGap ?? 12) + 'px',
-      '--fcl-font-size': (props.content?.fontSize ?? 14) + 'px',
+      '--fcl-gap': (props.content?.cardGap || 12) + 'px',
+      '--fcl-font-size': (props.content?.fontSize || 14) + 'px',
       display: 'flex',
       flexDirection: 'column',
-      gap: (props.content?.cardGap ?? 12) + 'px',
+      gap: (props.content?.cardGap || 12) + 'px',
       width: '100%',
     }));
 
     const cardStyle = computed(() => ({
       background: props.content?.cardBackground || '#ffffff',
       border: '1px solid ' + (props.content?.cardBorderColor || '#e5e7eb'),
-      borderRadius: (props.content?.cardBorderRadius ?? 8) + 'px',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
+      borderRadius: (props.content?.cardBorderRadius || 8) + 'px',
+      fontSize: (props.content?.fontSize || 14) + 'px',
     }));
 
     const folderNameStyle = computed(() => ({
       color: props.content?.folderNameColor || '#2d6a4f',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
+      fontSize: (props.content?.fontSize || 14) + 'px',
     }));
 
     const labelStyle = computed(() => ({
       color: props.content?.labelTextColor || '#6b7280',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
+      fontSize: (props.content?.fontSize || 14) + 'px',
     }));
 
     const valueStyle = computed(() => ({
       color: props.content?.valueTextColor || '#111827',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
+      fontSize: (props.content?.fontSize || 14) + 'px',
     }));
 
     const checkedBoxStyle = computed(() => ({
@@ -258,43 +320,49 @@ export default {
 
     const emptyStateStyle = computed(() => ({
       color: props.content?.labelTextColor || '#6b7280',
-      fontSize: (props.content?.fontSize ?? 14) + 'px',
+      fontSize: (props.content?.fontSize || 14) + 'px',
     }));
 
     const getAiPolicyText = (mode) => {
-      const m = String(mode ?? '').trim();
+      const m = String(mode || '').trim();
       if (m === 'Enabled') return 'Deep scan (content analysis)';
       if (m === 'Metadata') return 'Quick scan (metadata only)';
       return 'Disabled';
     };
 
     const getAiPolicyIcon = (mode) => {
-      const m = String(mode ?? '').trim();
+      const m = String(mode || '').trim();
       if (m === 'Enabled') return '🔍';
       if (m === 'Metadata') return '⚡';
       return '';
     };
 
     const handleOpen = (item) => {
-      const payload = item?._original ?? item;
+      const payload = item?._original || item;
       setSelectedItem(payload);
       emit('trigger-event', { name: 'open-click', event: { folder: payload } });
     };
 
     const handleEdit = (item) => {
-      const payload = item?._original ?? item;
+      const payload = item?._original || item;
       setSelectedItem(payload);
       emit('trigger-event', { name: 'edit-click', event: { folder: payload } });
     };
 
     const handleNameClick = (item) => {
-      const payload = item?._original ?? item;
+      const payload = item?._original || item;
       setSelectedItem(payload);
       emit('trigger-event', { name: 'name-click', event: { folder: payload } });
     };
 
     return {
       processedItems,
+      filteredItems,
+      searchQuery,
+      portalFilter,
+      handleSearchInput,
+      handlePortalChange,
+      handleReset,
       containerStyle,
       cardStyle,
       getOpenButtonStyle,
@@ -314,6 +382,8 @@ export default {
       setActive,
       selectedItem,
       itemCount,
+      filteredCount,
+      props,
       /* wwEditor:start */
       isEditing,
       /* wwEditor:end */
@@ -328,6 +398,85 @@ export default {
   box-sizing: border-box;
 }
 
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.filter-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px 7px 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #111827;
+  background: #ffffff;
+  outline: none;
+  font-family: inherit;
+}
+
+.filter-input:focus {
+  border-color: #2d6a4f;
+}
+
+.filter-select {
+  flex-shrink: 0;
+  padding: 7px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #111827;
+  background: #ffffff;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 130px;
+}
+
+.filter-select:focus {
+  border-color: #2d6a4f;
+}
+
+.filter-reset {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #2d6a4f;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 2px;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: underline;
+}
+
+.filter-reset:hover {
+  color: #1a4a35;
+}
+
+/* Cards */
 .folder-card {
   width: 100%;
   box-sizing: border-box;
@@ -354,7 +503,6 @@ export default {
   justify-content: center;
   padding: 6px 18px;
   border-radius: 999px;
-  font-size: var(--fcl-font-size, 14px);
   font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
