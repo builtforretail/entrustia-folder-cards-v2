@@ -131,6 +131,9 @@ export default {
     const isEditing = computed(() => props.wwEditorState?.isEditing);
     /* wwEditor:end */
 
+    // ── Call composables at top level of setup() — NEVER inside computed ──
+    const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
+
     const { value: selectedItem, setValue: setSelectedItem } =
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
@@ -185,7 +188,6 @@ export default {
 
     const processedItems = computed(() => {
       const items = props.content?.data || [];
-      const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
 
       return items.map((item) => {
         const id = resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
@@ -488,6 +490,7 @@ export default {
   border: 1px solid var(--fcl-card-border, #e5e7eb);
   border-radius: var(--fcl-card-radius, 8px);
   font-size: var(--fcl-font-size, 14px);
+  margin-bottom: 12px;
 }
 
 .card-actions {
