@@ -101,6 +101,28 @@
           </span>
         </span>
       </div>
+
+      <!-- View Only Link -->
+      <div class="card-field">
+        <span class="field-label" :style="labelStyle">View Only Link</span>
+        <button
+          class="btn-share-link"
+          :style="getShareLinkButtonStyle(item.id)"
+          type="button"
+          @click="handleShareLink(item)"
+          @mouseenter="setHover(item.id, 'share', true)"
+          @mouseleave="setHover(item.id, 'share', false)"
+          @mousedown="setActive(item.id, 'share', true)"
+          @mouseup="setActive(item.id, 'share', false)"
+          title="Copy view-only link"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="16 6 12 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="2" x2="12" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Empty state -->
@@ -138,7 +160,7 @@ export default {
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
         name: 'selectedItem',
-        type: 'object',
+        type: 'number',
         defaultValue: null,
       });
 
@@ -271,6 +293,19 @@ export default {
       };
     };
 
+    const getShareLinkButtonStyle = (id) => {
+      const isActive = activeState.value[id + '-share'];
+      const isHovered = hoverState.value[id + '-share'];
+      const base = resolvedPrimaryColor.value;
+      const color = isActive ? darken(base, 40) : isHovered ? darken(base, 20) : base;
+      return {
+        color: color,
+        borderColor: color,
+        transform: isActive ? 'scale(0.97)' : 'scale(1)',
+        transition: 'color 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
+      };
+    };
+
     const containerStyle = computed(() => ({
       '--fcl-primary': resolvedPrimaryColor.value,
       '--fcl-outline': resolvedOutlineColor.value,
@@ -357,6 +392,12 @@ export default {
       emit('trigger-event', { name: 'name-click', event: { folder: payload } });
     };
 
+    const handleShareLink = (item) => {
+      const payload = item?._original || item;
+      setSelectedItem(payload);
+      emit('trigger-event', { name: 'share-link-click', event: { folder: payload } });
+    };
+
     return {
       processedItems,
       filteredItems,
@@ -369,6 +410,7 @@ export default {
       cardStyle,
       getOpenButtonStyle,
       getEditButtonStyle,
+      getShareLinkButtonStyle,
       folderNameStyle,
       labelStyle,
       valueStyle,
@@ -380,6 +422,7 @@ export default {
       handleOpen,
       handleEdit,
       handleNameClick,
+      handleShareLink,
       setHover,
       setActive,
       selectedItem,
@@ -590,6 +633,20 @@ export default {
   flex-shrink: 0;
   pointer-events: none;
   user-select: none;
+}
+
+.btn-share-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
 }
 
 .empty-state {
