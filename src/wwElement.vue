@@ -155,7 +155,7 @@ export default {
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
         name: 'selectedItem',
-        type: 'number',
+        type: 'object',
         defaultValue: null,
       });
 
