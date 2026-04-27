@@ -204,11 +204,9 @@ export default {
     };
 
     const processedItems = computed(() => {
-      const raw = props.content?.data;
-      const items = Array.isArray(raw) ? raw : [];
+      const items = props.content?.data || [];
 
       return items.map((item) => {
-        if (!item || typeof item !== 'object') return null;
         const id = resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
         const name = resolveMappingFormula(props.content?.dataNameFormula, item) ?? item?.name;
         const file_count = resolveMappingFormula(props.content?.dataFileCountFormula, item) ?? item?.file_count;
@@ -224,24 +222,23 @@ export default {
           has_public_portal: Boolean(has_public_portal),
           _original: item,
         };
-      }).filter(Boolean);
+      });
     });
 
     const filteredItems = computed(() => {
-      const items = Array.isArray(processedItems.value) ? processedItems.value : [];
+      let items = processedItems.value;
       const q = (searchQuery.value || '').toLowerCase().trim();
       const p = portalFilter.value;
 
-      let result = items;
       if (q) {
-        result = result.filter((item) => (item.name || '').toLowerCase().indexOf(q) !== -1);
+        items = items.filter((item) => (item.name || '').toLowerCase().indexOf(q) !== -1);
       }
       if (p === 'active') {
-        result = result.filter((item) => item.has_public_portal === true);
+        items = items.filter((item) => item.has_public_portal === true);
       } else if (p === 'inactive') {
-        result = result.filter((item) => item.has_public_portal === false);
+        items = items.filter((item) => item.has_public_portal === false);
       }
-      return result;
+      return items;
     });
 
     watch(processedItems, (items) => { setItemCount(items.length || 0); }, { immediate: true });
@@ -393,7 +390,41 @@ export default {
     const handleShareLink = (item) => {
       const payload = item?._original || item;
       setSelectedItem(payload);
-      emit('trigger-event', { name: 'share-link-click', event: { folder: payload } });
+
+      // Attempt synchronous clipboard copy for Safari iOS compatibility.
+      // shareLinkMap is an object keyed by folder id, pre-fetched on page load.
+      const folderId = payload?.id;
+      const shareLinkMap = props.content?.shareLinkMap;
+      const url = shareLinkMap && folderId ? shareLinkMap[folderId] || shareLinkMap[String(folderId)] : null;
+
+      if (url) {
+        // Try modern clipboard API first
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(url).catch(function() {
+            execCommandCopy(url);
+          });
+        } else {
+          execCommandCopy(url);
+        }
+      }
+
+      emit('trigger-event', { name: 'share-link-click', event: { folder: payload, url: url || '' } });
+    };
+
+    const execCommandCopy = function(text) {
+      try {
+        var doc = wwLib.getFrontDocument();
+        var el = doc.createElement('textarea');
+        el.value = text;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        doc.body.appendChild(el);
+        el.select();
+        el.setSelectionRange(0, 99999);
+        doc.execCommand('copy');
+        doc.body.removeChild(el);
+      } catch (e) {}
     };
 
     return {
