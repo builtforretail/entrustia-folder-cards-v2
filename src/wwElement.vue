@@ -204,9 +204,11 @@ export default {
     };
 
     const processedItems = computed(() => {
-      const items = props.content?.data || [];
+      const raw = props.content?.data;
+      const items = Array.isArray(raw) ? raw : [];
 
       return items.map((item) => {
+        if (!item || typeof item !== 'object') return null;
         const id = resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
         const name = resolveMappingFormula(props.content?.dataNameFormula, item) ?? item?.name;
         const file_count = resolveMappingFormula(props.content?.dataFileCountFormula, item) ?? item?.file_count;
@@ -222,23 +224,24 @@ export default {
           has_public_portal: Boolean(has_public_portal),
           _original: item,
         };
-      });
+      }).filter(Boolean);
     });
 
     const filteredItems = computed(() => {
-      let items = processedItems.value;
+      const items = Array.isArray(processedItems.value) ? processedItems.value : [];
       const q = (searchQuery.value || '').toLowerCase().trim();
       const p = portalFilter.value;
 
+      let result = items;
       if (q) {
-        items = items.filter((item) => (item.name || '').toLowerCase().indexOf(q) !== -1);
+        result = result.filter((item) => (item.name || '').toLowerCase().indexOf(q) !== -1);
       }
       if (p === 'active') {
-        items = items.filter((item) => item.has_public_portal === true);
+        result = result.filter((item) => item.has_public_portal === true);
       } else if (p === 'inactive') {
-        items = items.filter((item) => item.has_public_portal === false);
+        result = result.filter((item) => item.has_public_portal === false);
       }
-      return items;
+      return result;
     });
 
     watch(processedItems, (items) => { setItemCount(items.length || 0); }, { immediate: true });
