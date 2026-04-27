@@ -156,6 +156,20 @@ export default {
         !Array.isArray(content.data) || !content.data?.length || !boundProps.data,
     },
 
+    shareLinkMap: {
+      label: { en: 'Share Link Map (folder id → URL)' },
+      type: 'Object',
+      section: 'settings',
+      bindable: true,
+      defaultValue: {},
+      /* wwEditor:start */
+      bindingValidation: {
+        type: 'object',
+        tooltip: 'Bind to a page variable containing an object keyed by folder ID with Dropbox share link URLs as values. Used for synchronous clipboard copy on Safari iOS.',
+      },
+      /* wwEditor:end */
+    },
+
     primaryColor: {
       label: { en: 'Primary Color (Open Button)' },
       type: 'Color',
